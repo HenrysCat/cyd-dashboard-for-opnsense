@@ -8,6 +8,12 @@ on:
     paths:
       - 'middleware/**'
       - '.github/workflows/middleware-image.yml'
+      # Documentation does not change the image. Without this, editing
+      # middleware/README.md rebuilds amd64 + arm64 to produce an identical
+      # image. Exclusions are evaluated after the includes above, so this
+      # wins for a docs-only push -- and if every changed file is excluded,
+      # the workflow does not run at all.
+      - '!**.md'
   workflow_dispatch:
 
 jobs:
