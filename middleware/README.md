@@ -32,6 +32,65 @@ screwed to a wall.
 
 ## Step 2: Configure and start it
 
+Two ways in. **Option A** needs nothing but a browser and is the one to use with Portainer.
+**Option B** is the command line.
+
+### Option A: Portainer (copy and paste)
+
+**Stacks > Add stack > Web editor**, give it a name, and paste this in whole. Edit the three
+marked values, then **Deploy the stack** -- there is nothing to clone and nothing to build.
+
+```yaml
+services:
+  cyd-dashboard-middleware:
+    image: ghcr.io/henryscat/cyd-dashboard-middleware:latest
+    restart: unless-stopped
+    ports:
+      # Change 8098 if that port is taken on this machine. Leave :8000 alone --
+      # that is the port inside the container. Whatever you put on the left is
+      # what you type into the display during setup.
+      - "8098:8000"
+    environment:
+      # ---------------- EDIT THESE THREE ----------------
+      OPNSENSE_HOST: 192.168.1.1
+      OPNSENSE_API_KEY: paste-your-api-key-here
+      OPNSENSE_API_SECRET: paste-your-api-secret-here
+      # --------------------------------------------------
+      # OPNsense ships a self-signed certificate, which is rejected unless this
+      # is "false" or you have installed a trusted certificate on the firewall.
+      VERIFY_SSL: "false"
+      POLL_INTERVAL_FAST: "2.0"
+      POLL_INTERVAL_SLOW: "15.0"
+      DATA_DIR: /app/data
+    volumes:
+      - dashboard_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  dashboard_data:
+```
+
+The image is public, so Portainer needs no registry credentials. Skip to
+[checking it works](#check-it-works).
+
+> **Changing a key later takes one extra step.** The environment variables above seed
+> `config.json` on the volume on **first run only** -- after that `config.json` is the source of
+> truth, so editing the stack and redeploying will *not* pick up a new key, host or interval. To
+> genuinely change one, delete the stack **with its volume** (in Portainer, tick *Remove volumes*)
+> and deploy it again.
+
+Prefer to track this repo instead of pasting? **Stacks > Add stack > Repository** also works ---
+repository URL of this repo, compose path `middleware/docker-compose.yml`, and add the variables
+from `.env.example` under the stack's own environment variables, since Portainer does not read a
+`.env` file out of a repo.
+
+### Option B: command line
+
 ```
 cd middleware
 cp .env.example .env
@@ -63,7 +122,7 @@ pull a published image):
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-Check it works:
+### Check it works
 
 ```
 curl http://localhost:8098/dashboard
@@ -74,15 +133,6 @@ machine's LAN IP instead of `localhost`) is what you enter on the display during
 
 > **Port 8098, not 8000** - Portainer commonly uses 8000 on the same machine. Change it with
 > `MIDDLEWARE_PORT` in `.env` if 8098 clashes with something of yours.
-
-### Running it as a Portainer stack
-
-**Stacks > Add stack > Repository** deploys straight from this repo:
-
-- Repository URL: this repo
-- Compose path: `middleware/docker-compose.yml`
-- Add the variables from `.env.example` under the stack's environment variables. Portainer does
-  not read a `.env` file from the repo.
 
 ## Updating
 
