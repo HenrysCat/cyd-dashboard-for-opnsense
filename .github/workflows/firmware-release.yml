@@ -63,4 +63,28 @@ jobs:
           files: |
             firmware/.pio/build/esp32dev/firmware.bin
             firmware/.pio/build/esp32dev/firmware-merged.bin
+          # Appended rather than set, so hand-written release notes survive.
+          # Two similarly named binaries on a download page is a trap: the
+          # wrong choice bricks a blank board silently.
+          append_body: true
+          body: |
+            ---
+
+            ### Which file do I download?
+
+            **Flashing a board over USB → `firmware-merged.bin`**
+
+            ```
+            esptool.py --chip esp32 --port COM5 write_flash 0x0 firmware-merged.bin
+            ```
+
+            **Updating over Wi-Fi → `firmware.bin`**, uploaded on the device's settings page
+            under *Firmware*.
+
+            They are not alternatives: `firmware-merged.bin` is `firmware.bin` plus the
+            bootloader, partition table and `boot_app0` that live in the 64KB in front of it.
+            Writing `firmware.bin` to `0x0` leaves a board that will not boot; uploading
+            `firmware-merged.bin` as an OTA update is rejected. See the
+            [firmware README](https://github.com/HenrysCat/cyd-dashboard-for-opnsense/tree/main/firmware#which-binary-do-i-need)
+            for why.
         if: github.ref_type == 'tag'

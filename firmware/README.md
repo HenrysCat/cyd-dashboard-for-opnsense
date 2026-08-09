@@ -51,6 +51,36 @@ In VS Code you can instead press the PlatformIO **Upload** button in the status 
 > just as the upload starts. Do not keep holding BOOT once the device reboots -- ten seconds of it
 > triggers the factory reset.
 
+### Which binary do I need?
+
+**Cable to a blank board: merged. Over Wi-Fi: plain.**
+
+The two release assets are not alternatives -- one contains the other. `firmware-merged.bin` is
+`firmware.bin` plus the 64KB of flash that sits in front of it:
+
+| Offset | Contents | In `firmware.bin`? |
+|---|---|---|
+| `0x1000` | Second-stage bootloader | No |
+| `0x8000` | Partition table | No |
+| `0xe000` | `boot_app0` -- which app slot to boot | No |
+| `0x10000` | **The application itself** | This is the whole file |
+
+So `firmware.bin` is the compiled program and nothing else. It has no idea where in flash it
+belongs; the bootloader and partition table are what put it there. From `0x10000` onward, the two
+files are byte for byte identical.
+
+That leads to two failure modes worth avoiding:
+
+- **`firmware.bin` written to `0x0` over USB** puts the application where the bootloader should
+  be. Nothing is left to start it and no table describes the layout, so the board does not boot --
+  silently, with a blank screen that looks like dead hardware.
+- **`firmware-merged.bin` uploaded as an OTA update** is rejected. The device flashes the
+  *inactive* app slot and then points `boot_app0` at it, so it expects an application image alone;
+  a bootloader and partition table are not valid in that slot.
+
+Once the merged image is on the board you never need it again -- every later update is the plain
+`firmware.bin` through the settings page, with no cable involved.
+
 ## First-time setup
 
 On first boot the screen explains what to do, and the device creates its own Wi-Fi network:
