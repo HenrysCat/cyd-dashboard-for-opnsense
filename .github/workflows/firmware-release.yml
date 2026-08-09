@@ -1,0 +1,66 @@
+name: Attach firmware to release
+
+# Builds the firmware from the tagged source and attaches it to the GitHub
+# release, so a CYD can be flashed and updated without installing PlatformIO.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ~/.platformio holds the toolchain and framework packages, which are
+      # far slower to download than the build itself takes to run.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: pio-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio esptool
+
+      - name: Build
+        working-directory: firmware
+        run: pio run
+
+      # firmware.bin alone cannot flash a blank board -- it is only the app
+      # partition. This merges it with the bootloader, partition table and
+      # boot_app0 into one image writable at 0x0 with nothing but esptool.
+      - name: Build merged flash image
+        working-directory: firmware
+        run: |
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32/tools/partitions -name boot_app0.bin | head -1)
+          echo "boot_app0: $BOOT_APP0"
+          python -m esptool --chip esp32 merge_bin \
+            -o .pio/build/esp32dev/firmware-merged.bin \
+            --flash_mode dio --flash_freq 40m --flash_size 4MB \
+            0x1000  .pio/build/esp32dev/bootloader.bin \
+            0x8000  .pio/build/esp32dev/partitions.bin \
+            0xe000  "$BOOT_APP0" \
+            0x10000 .pio/build/esp32dev/firmware.bin
+          ls -la .pio/build/esp32dev/*.bin
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          # Only set on a tag push; a manual run builds without publishing.
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          files: |
+            firmware/.pio/build/esp32dev/firmware.bin
+            firmware/.pio/build/esp32dev/firmware-merged.bin
+        if: github.ref_type == 'tag'
