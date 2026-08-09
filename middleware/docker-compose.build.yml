@@ -1,0 +1,10 @@
+# Overlay that builds the image from this directory instead of pulling the
+# published one. Use it when you are changing the middleware's code:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# The `--build` matters: with an image already present, compose reuses it and
+# your edits will not appear.
+services:
+  cyd-dashboard-middleware:
+    build: .
