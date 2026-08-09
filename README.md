@@ -16,7 +16,9 @@ device and from a small web UI it serves on your network.
 Two halves, and the order matters:
 
 1. **[Set up the middleware](middleware/)** on an always-on machine with Docker. It needs an
-   OPNsense API key.
+   OPNsense API key. If you run Portainer, there is a
+   [copy-paste stack](middleware/README.md#option-a-portainer-copy-and-paste) -- paste it, edit
+   three values, deploy.
 2. **[Flash the display](firmware/)** and point it at the middleware's address.
 
 No credentials are compiled into the firmware -- Wi-Fi and the middleware address are entered on
@@ -87,6 +89,4 @@ MIT -- see [`LICENSE`](LICENSE).
 
 ## Trademarks
 
-OPNsense® is a registered trademark of Deciso B.V. CrowdSec is a trademark of CrowdSec SAS. This is
-an unofficial, independent project and is not affiliated with, endorsed by, or sponsored by Deciso
-B.V. or CrowdSec SAS.
+OPNsense® is a registered trademark of Deciso B.V. CrowdSec is a trademark of CrowdSec SAS. This is an unofficial, independent project and is not affiliated with, endorsed by, or sponsored by Deciso B.V. or CrowdSec SAS.
