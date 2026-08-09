@@ -12,13 +12,33 @@ needs its address during setup.
   (2.8in, 320x240, resistive touch). Other CYD variants usually work - see
   [Troubleshooting](#troubleshooting) if the screen looks wrong.
 - A USB cable, for the first flash only. After that you can update over Wi-Fi.
-- [PlatformIO](https://platformio.org/install/ide?install=vscode) - either the VS Code extension
-  or the command line (`pip install platformio`).
+- Either [esptool](https://pypi.org/project/esptool/) (`pip install esptool`) to flash a
+  prebuilt binary, or [PlatformIO](https://platformio.org/install/ide?install=vscode) to build
+  from source. You do not need both.
 
 ## Flashing it
 
-There is nothing to edit before building. Wi-Fi details and the middleware address are entered on
-the device itself, so no passwords are baked into the firmware.
+Nothing needs editing first, whichever route you take. Wi-Fi details and the middleware address
+are entered on the device itself, so no passwords are baked into the firmware.
+
+### Option A: flash a release binary (no PlatformIO)
+
+Download **`firmware-merged.bin`** from the
+[latest release](https://github.com/HenrysCat/cyd-dashboard-for-opnsense/releases/latest) and
+write it to the board:
+
+```
+esptool.py --chip esp32 --port COM5 write_flash 0x0 firmware-merged.bin
+```
+
+Replace `COM5` with your board's port -- `/dev/ttyUSB0` on Linux, `/dev/cu.usbserial-*` on macOS.
+
+> **Use `firmware-merged.bin`, not `firmware.bin`.** The merged image contains the bootloader,
+> partition table and app together and is written at `0x0`. `firmware.bin` is the app on its own,
+> for over-the-air updates only -- flashing it to a blank board over USB leaves an unbootable
+> device.
+
+### Option B: build from source
 
 ```
 cd firmware
@@ -28,7 +48,8 @@ pio run -t upload
 In VS Code you can instead press the PlatformIO **Upload** button in the status bar.
 
 > **Tip:** if the upload cannot connect, hold the **BOOT** button, tap **RST**, then release BOOT
-> just as the upload starts.
+> just as the upload starts. Do not keep holding BOOT once the device reboots -- ten seconds of it
+> triggers the factory reset.
 
 ## First-time setup
 
@@ -91,9 +112,18 @@ looks wrong out of the box, one of those toggles almost certainly fixes it.
 
 ## Updating later
 
-You do not need to take it off the wall. On the settings page, scroll to **Firmware**, choose the
-`firmware.bin` that `pio run` produces (in `.pio/build/esp32dev/`), and upload it. The device
-flashes itself and restarts.
+You do not need to take it off the wall, or plug it in. On the settings page, scroll to
+**Firmware**, choose a `firmware.bin` and upload it -- the device flashes itself and restarts.
+
+Get that file from either:
+
+- the [latest release](https://github.com/HenrysCat/cyd-dashboard-for-opnsense/releases/latest) --
+  the plain **`firmware.bin`** asset, which is exactly what this expects, or
+- your own build, at `firmware/.pio/build/esp32dev/firmware.bin` after `pio run`.
+
+> Over-the-air updates need two app partitions to flash between, which is why
+> [`platformio.ini`](platformio.ini) sets `min_spiffs.csv`. A single-app partition table breaks
+> this feature.
 
 ## Is it working?
 

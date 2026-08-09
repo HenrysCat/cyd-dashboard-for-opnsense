@@ -19,7 +19,9 @@ Two halves, and the order matters:
    OPNsense API key. If you run Portainer, there is a
    [copy-paste stack](middleware/README.md#option-a-portainer-copy-and-paste) -- paste it, edit
    three values, deploy.
-2. **[Flash the display](firmware/)** and point it at the middleware's address.
+2. **[Flash the display](firmware/)** and point it at the middleware's address. Prebuilt binaries
+   are attached to every [release](https://github.com/HenrysCat/cyd-dashboard-for-opnsense/releases/latest),
+   so PlatformIO is only needed if you want to change the code.
 
 No credentials are compiled into the firmware -- Wi-Fi and the middleware address are entered on
 the device itself on first boot.
