@@ -1,0 +1,19 @@
+# Middleware (Python)
+middleware/__pycache__/
+middleware/**/__pycache__/
+middleware/.venv/
+middleware/venv/
+middleware/.env
+middleware/data/*
+!middleware/data/.gitkeep
+*.pyc
+
+# Firmware (PlatformIO)
+firmware/.pio/
+
+# Editors / OS
+.vscode/
+# Machine-local Claude Code permissions, not meant to be shared
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

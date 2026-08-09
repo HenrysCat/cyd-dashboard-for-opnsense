@@ -1,0 +1,45 @@
+# Usable directly with `docker compose up -d` from this directory, and as a
+# Portainer "Repository" stack pointed at this repo with
+# Compose file path: middleware/docker-compose.yml
+#
+# Reads middleware/.env for OPNSENSE_HOST / OPNSENSE_API_KEY / OPNSENSE_API_SECRET
+# (docker compose auto-loads a .env file next to this compose file).
+#
+# This file pulls a prebuilt image rather than building one. That is deliberate:
+# Portainer will not rebuild a `build:` stack when the source changes, so a
+# "Pull and redeploy" would keep serving the stale cached image
+# (portainer/portainer#12508). Pulling a tagged image makes Portainer's
+# "Re-pull image" work as expected. To build from source instead, see
+# docker-compose.build.yml.
+services:
+  cyd-dashboard-middleware:
+    image: ghcr.io/henryscat/cyd-dashboard-middleware:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      # Host-side port only -- the container always listens on 8000 internally.
+      # Defaults to 8098 rather than 8000 since Portainer's edge-agent tunnel
+      # commonly occupies 8000 on the same host; override via MIDDLEWARE_PORT
+      # in .env if 8098 also collides with something on your host.
+      - "${MIDDLEWARE_PORT:-8098}:8000"
+    environment:
+      OPNSENSE_HOST: ${OPNSENSE_HOST:-}
+      OPNSENSE_API_KEY: ${OPNSENSE_API_KEY:-}
+      OPNSENSE_API_SECRET: ${OPNSENSE_API_SECRET:-}
+      VERIFY_SSL: ${VERIFY_SSL:-true}
+      POLL_INTERVAL_FAST: ${POLL_INTERVAL_FAST:-2.0}
+      POLL_INTERVAL_SLOW: ${POLL_INTERVAL_SLOW:-15.0}
+      DATA_DIR: /app/data
+    volumes:
+      - dashboard_data:/app/data
+    # restart: unless-stopped only catches a container that has *exited*. This
+    # catches one that is still running but wedged (e.g. the poll loops
+    # deadlocked), which would otherwise serve stale data indefinitely.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  dashboard_data:

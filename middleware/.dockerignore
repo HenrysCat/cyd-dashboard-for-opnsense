@@ -1,0 +1,19 @@
+# Never bake secrets into an image layer. The container receives its
+# configuration through environment variables from compose, not from a file
+# copied at build time -- and this image gets published to a public registry.
+.env
+
+# Runtime state lives on a volume (DATA_DIR=/app/data), not in the image.
+data/
+
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.build.yml
+README.md
