@@ -3,6 +3,8 @@
 Live [OPNsense](https://opnsense.org/) firewall stats on a "Cheap Yellow Display" -- the
 inexpensive ESP32-2432S028R touchscreen board (320x240, ILI9341, resistive touch).
 
+<a href="https://www.buymeacoffee.com/Henrys_Cat" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ![The dashboard cycling through its pages on the device](assets/dashboard-demo.gif)
 
 *Sped up 4x -- [full-speed video](assets/Dashboard_Video.mp4) (40s).*
