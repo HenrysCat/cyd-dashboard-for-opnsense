@@ -21,6 +21,9 @@ needs its address during setup.
 Nothing needs editing first, whichever route you take. Wi-Fi details and the middleware address
 are entered on the device itself, so no passwords are baked into the firmware.
 
+The quickest route needs nothing installed at all: flash straight from a Chrome or Edge browser
+at **https://henryscat.github.io/**. The options below are for doing it yourself instead.
+
 ### Option A: flash a release binary (no PlatformIO)
 
 Download **`firmware-merged.bin`** from the
