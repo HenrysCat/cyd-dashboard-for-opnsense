@@ -13,6 +13,7 @@ firmware/.pio/
 
 # Editors / OS
 .vscode/
+*.code-workspace
 # Machine-local Claude Code permissions, not meant to be shared
 .claude/settings.local.json
 .DS_Store
