@@ -53,6 +53,10 @@ jobs:
             0x8000  .pio/build/esp32dev/partitions.bin \
             0xe000  "$BOOT_APP0" \
             0x10000 .pio/build/esp32dev/firmware.bin
+          # Also kept as a standalone asset: it comes from the framework
+          # package rather than the build, so it is not otherwise downloadable
+          # by anyone flashing the four parts individually.
+          cp "$BOOT_APP0" .pio/build/esp32dev/boot_app0.bin
           ls -la .pio/build/esp32dev/*.bin
 
       - name: Attach to release
@@ -63,6 +67,9 @@ jobs:
           files: |
             firmware/.pio/build/esp32dev/firmware.bin
             firmware/.pio/build/esp32dev/firmware-merged.bin
+            firmware/.pio/build/esp32dev/bootloader.bin
+            firmware/.pio/build/esp32dev/partitions.bin
+            firmware/.pio/build/esp32dev/boot_app0.bin
           # Appended rather than set, so hand-written release notes survive.
           # Two similarly named binaries on a download page is a trap: the
           # wrong choice bricks a blank board silently.
@@ -80,6 +87,10 @@ jobs:
 
             **Updating over Wi-Fi → `firmware.bin`**, uploaded on the device's settings page
             under *Firmware*.
+
+            **Prefer to write the parts individually?** `bootloader.bin` at `0x1000`,
+            `partitions.bin` at `0x8000`, `boot_app0.bin` at `0xe000` and `firmware.bin`
+            at `0x10000` — the same layout `firmware-merged.bin` already contains.
 
             They are not alternatives: `firmware-merged.bin` is `firmware.bin` plus the
             bootloader, partition table and `boot_app0` that live in the 64KB in front of it.
