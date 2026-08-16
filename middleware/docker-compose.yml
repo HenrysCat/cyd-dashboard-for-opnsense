@@ -28,6 +28,9 @@ services:
       VERIFY_SSL: ${VERIFY_SSL:-true}
       POLL_INTERVAL_FAST: ${POLL_INTERVAL_FAST:-2.0}
       POLL_INTERVAL_SLOW: ${POLL_INTERVAL_SLOW:-15.0}
+      # Sets where the daily/monthly traffic totals roll over. Without it the
+      # container runs on UTC, so "today" would end at the wrong midnight.
+      TZ: ${TZ:-UTC}
       DATA_DIR: /app/data
     volumes:
       - dashboard_data:/app/data

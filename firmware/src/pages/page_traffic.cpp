@@ -5,6 +5,8 @@
 static lv_obj_t *label_in_val;
 static lv_obj_t *label_out_val;
 static lv_obj_t *label_lan;
+static lv_obj_t *label_today;
+static lv_obj_t *label_month;
 static lv_obj_t *chart_traffic;
 static lv_chart_series_t *series_in;
 static lv_chart_series_t *series_out;
@@ -13,6 +15,16 @@ static String formatBps(uint32_t bps) {
     if (bps >= 1000000) return String(bps / 1000000.0, 1) + " Mbps";
     if (bps >= 1000) return String(bps / 1000.0, 1) + " Kbps";
     return String(bps) + " bps";
+}
+
+// Decimal units, matching formatBps above and the way an ISP quotes a monthly
+// allowance -- these figures exist to be compared against a cap.
+static String formatBytes(uint64_t bytes) {
+    if (bytes >= 1000000000000ULL) return String(bytes / 1e12, 2) + " TB";
+    if (bytes >= 1000000000ULL) return String(bytes / 1e9, 2) + " GB";
+    if (bytes >= 1000000ULL) return String(bytes / 1e6, 1) + " MB";
+    if (bytes >= 1000ULL) return String(bytes / 1e3, 1) + " KB";
+    return String((uint32_t)bytes) + " B";
 }
 
 // lv_coord_t is a 16-bit signed value, far too small for raw bps on a fast
@@ -41,24 +53,26 @@ lv_obj_t *page_traffic_create() {
     lv_obj_t *in_caption = lv_label_create(scr);
     lv_obj_set_style_text_color(in_caption, lv_color_hex(0xAAAAAA), 0);
     lv_label_set_text(in_caption, "In");
-    lv_obj_align(in_caption, LV_ALIGN_TOP_LEFT, 10, 34);
+    // Sits on the title's line: the title is centred and narrow enough to leave
+    // both ends free, and reclaiming this row is what lets the chart grow.
+    lv_obj_align(in_caption, LV_ALIGN_TOP_LEFT, 10, 7);
 
     label_in_val = lv_label_create(scr);
     lv_obj_set_style_text_font(label_in_val, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(label_in_val, lv_palette_main(LV_PALETTE_BLUE), 0);
     lv_label_set_text(label_in_val, "-- bps");
-    lv_obj_align(label_in_val, LV_ALIGN_TOP_LEFT, 10, 52);
+    lv_obj_align(label_in_val, LV_ALIGN_TOP_LEFT, 10, 29);
 
     lv_obj_t *out_caption = lv_label_create(scr);
     lv_obj_set_style_text_color(out_caption, lv_color_hex(0xAAAAAA), 0);
     lv_label_set_text(out_caption, "Out");
-    lv_obj_align(out_caption, LV_ALIGN_TOP_RIGHT, -10, 34);
+    lv_obj_align(out_caption, LV_ALIGN_TOP_RIGHT, -10, 7);
 
     label_out_val = lv_label_create(scr);
     lv_obj_set_style_text_font(label_out_val, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(label_out_val, lv_palette_main(LV_PALETTE_ORANGE), 0);
     lv_label_set_text(label_out_val, "-- bps");
-    lv_obj_align(label_out_val, LV_ALIGN_TOP_RIGHT, -10, 52);
+    lv_obj_align(label_out_val, LV_ALIGN_TOP_RIGHT, -10, 29);
 
     // LAN shown as text rather than plotted: local throughput is routinely an
     // order of magnitude larger than WAN, so sharing the chart's Y axis would
@@ -67,10 +81,27 @@ lv_obj_t *page_traffic_create() {
     lv_obj_set_style_text_font(label_lan, &lv_font_montserrat_12, 0);
     lv_obj_set_style_text_color(label_lan, lv_color_hex(0xAAAAAA), 0);
     lv_label_set_text(label_lan, "LAN  in --  out --");
-    lv_obj_align(label_lan, LV_ALIGN_TOP_MID, 0, 80);
+    lv_obj_align(label_lan, LV_ALIGN_TOP_MID, 0, 58);
+
+    // Totals are accumulated by the middleware, not derived from the history
+    // buffer above: that only holds the last two minutes, and only for as long
+    // as the board stays powered.
+    label_today = lv_label_create(scr);
+    lv_obj_set_style_text_font(label_today, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(label_today, lv_color_hex(0xAAAAAA), 0);
+    lv_label_set_text(label_today, "Today  in --  out --");
+    lv_obj_align(label_today, LV_ALIGN_TOP_MID, 0, 74);
+
+    label_month = lv_label_create(scr);
+    lv_obj_set_style_text_font(label_month, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_color(label_month, lv_color_hex(0xAAAAAA), 0);
+    lv_label_set_text(label_month, "Month  in --  out --");
+    lv_obj_align(label_month, LV_ALIGN_TOP_MID, 0, 90);
 
     chart_traffic = lv_chart_create(scr);
-    lv_obj_set_size(chart_traffic, 300, 104);
+    // Sized against the text above it: the last total line ends at y=105 and
+    // the chart's top edge lands at y=110 (240 - 18 bottom offset - 112).
+    lv_obj_set_size(chart_traffic, 300, 112);
     // Leaves room below for the page-dot indicator drawn on the top layer.
     lv_obj_align(chart_traffic, LV_ALIGN_BOTTOM_MID, 0, -18);
     lv_chart_set_type(chart_traffic, LV_CHART_TYPE_LINE);
@@ -100,6 +131,14 @@ void page_traffic_update() {
     String lan = "LAN  in " + formatBps(g_dashboard.lan_in_bps) + "   out " +
                  formatBps(g_dashboard.lan_out_bps);
     lv_label_set_text(label_lan, lan.c_str());
+
+    String today = "Today  in " + formatBytes(g_dashboard.wan_today_in_bytes) +
+                   "   out " + formatBytes(g_dashboard.wan_today_out_bytes);
+    lv_label_set_text(label_today, today.c_str());
+
+    String month = "Month  in " + formatBytes(g_dashboard.wan_month_in_bytes) +
+                   "   out " + formatBytes(g_dashboard.wan_month_out_bytes);
+    lv_label_set_text(label_month, month.c_str());
 
     lv_coord_t max_kbps = 100;  // floor, so an idle link doesn't look like a flat wall
     for (size_t i = 0; i < g_dashboard.traffic_in_history.count; i++) {

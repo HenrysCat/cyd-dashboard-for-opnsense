@@ -12,6 +12,12 @@ void ApiClient::begin(const char *baseUrl) {
     _baseUrl = baseUrl;
 }
 
+void ApiClient::setBaseUrl(const String &url) {
+    if (url == _baseUrl) return;
+    _baseUrl = url;
+    _lastFetch = 0;
+}
+
 void ApiClient::loop() {
     unsigned long now = millis();
     if (now - _lastFetch < FETCH_INTERVAL_MS) return;
@@ -140,6 +146,10 @@ void ApiClient::fetchDashboard() {
         g_dashboard.wan_out_bps = traffic["wan_out_bps"] | 0;
         g_dashboard.lan_in_bps = traffic["lan_in_bps"] | 0;
         g_dashboard.lan_out_bps = traffic["lan_out_bps"] | 0;
+        g_dashboard.wan_today_in_bytes = traffic["wan_today_in_bytes"] | (uint64_t)0;
+        g_dashboard.wan_today_out_bytes = traffic["wan_today_out_bytes"] | (uint64_t)0;
+        g_dashboard.wan_month_in_bytes = traffic["wan_month_in_bytes"] | (uint64_t)0;
+        g_dashboard.wan_month_out_bytes = traffic["wan_month_out_bytes"] | (uint64_t)0;
         g_dashboard.traffic_in_history.push((float)g_dashboard.wan_in_bps);
         g_dashboard.traffic_out_history.push((float)g_dashboard.wan_out_bps);
         g_dashboard.traffic_valid = true;

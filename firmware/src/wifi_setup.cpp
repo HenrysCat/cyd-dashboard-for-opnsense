@@ -67,7 +67,7 @@ static String checkboxHtml(bool checked) {
 // split below (e.g. a bare "192.168.0.5:8098" typed before scheme handling
 // existed at all) so it self-heals on the next boot without another portal
 // round-trip.
-static String normalizeMiddlewareUrl(String url) {
+static String normalizeStoredUrl(String url) {
     url.trim();
     if (url.length() == 0) return url;
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -80,9 +80,9 @@ static String normalizeMiddlewareUrl(String url) {
 }
 
 // Splits a full "http(s)://host:port" URL into its host:port part and a
-// scheme flag, for pre-filling the portal's separate host field + HTTPS
-// checkbox from whatever's currently stored.
-static void splitMiddlewareUrl(const String &url, String &hostPort, bool &isHttps) {
+// scheme flag, for pre-filling the separate host field + HTTPS checkbox shown
+// by both the captive portal and the settings UI.
+void wifi_setup_split_url(const String &url, String &hostPort, bool &isHttps) {
     if (url.startsWith("https://")) {
         isHttps = true;
         hostPort = url.substring(8);
@@ -98,12 +98,12 @@ static void splitMiddlewareUrl(const String &url, String &hostPort, bool &isHttp
 String wifi_setup_begin() {
     Preferences prefs;
     prefs.begin("netcfg", true);
-    String storedUrl = normalizeMiddlewareUrl(prefs.getString("mw_url", ""));
+    String storedUrl = normalizeStoredUrl(prefs.getString("mw_url", ""));
     prefs.end();
 
     String storedHostPort;
     bool storedIsHttps;
-    splitMiddlewareUrl(storedUrl, storedHostPort, storedIsHttps);
+    wifi_setup_split_url(storedUrl, storedHostPort, storedIsHttps);
 
     // Shares the DisplaySettings store with the web UI rather than keeping a
     // second copy -- this is just an escape hatch for fixing an upside-down
@@ -151,21 +151,11 @@ String wifi_setup_begin() {
     // Reading them outside an actual submission is meaningless, so the write
     // below is gated on s_portalShown.
     if (s_portalShown) {
-        String newHostPort = String(customMwHost.getValue());
-        newHostPort.trim();
-        while (newHostPort.endsWith("/")) {
-            newHostPort.remove(newHostPort.length() - 1);
-        }
-        bool newIsHttps = String(customUseHttps.getValue()) == "T";
-        String newUrl = newHostPort.length() > 0
-                             ? String(newIsHttps ? "https://" : "http://") + newHostPort
-                             : "";
+        String newUrl = wifi_setup_build_url(String(customMwHost.getValue()),
+                                             String(customUseHttps.getValue()) == "T");
 
         if (newUrl.length() > 0 && newUrl != storedUrl) {
-            Preferences writePrefs;
-            writePrefs.begin("netcfg", false);
-            writePrefs.putString("mw_url", newUrl);
-            writePrefs.end();
+            wifi_setup_store_middleware_url(newUrl);
             storedUrl = newUrl;
         }
 
@@ -181,6 +171,32 @@ String wifi_setup_begin() {
     }
 
     return storedUrl;
+}
+
+String wifi_setup_build_url(String hostPort, bool useHttps) {
+    hostPort.trim();
+    // Both entry points label this field "host:port", but a pasted address is
+    // the obvious thing to try -- take the scheme off rather than concatenating
+    // it into "http://http://host".
+    if (hostPort.startsWith("https://")) {
+        useHttps = true;
+        hostPort = hostPort.substring(8);
+    } else if (hostPort.startsWith("http://")) {
+        useHttps = false;
+        hostPort = hostPort.substring(7);
+    }
+    while (hostPort.endsWith("/")) {
+        hostPort.remove(hostPort.length() - 1);
+    }
+    if (hostPort.length() == 0) return "";
+    return String(useHttps ? "https://" : "http://") + hostPort;
+}
+
+void wifi_setup_store_middleware_url(const String &url) {
+    Preferences prefs;
+    prefs.begin("netcfg", false);
+    prefs.putString("mw_url", url);
+    prefs.end();
 }
 
 void wifi_setup_reset_and_restart() {

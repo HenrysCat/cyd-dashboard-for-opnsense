@@ -111,6 +111,13 @@ struct DashboardData {
     uint32_t wan_out_bps = 0;
     uint32_t lan_in_bps = 0;
     uint32_t lan_out_bps = 0;
+    // Running WAN totals, accumulated and persisted by the middleware so they
+    // survive a reboot of either end. 64-bit because 32 would wrap at 4GB,
+    // which a month's usage passes in a day on most links.
+    uint64_t wan_today_in_bytes = 0;
+    uint64_t wan_today_out_bytes = 0;
+    uint64_t wan_month_in_bytes = 0;
+    uint64_t wan_month_out_bytes = 0;
     bool traffic_valid = false;
     RingBuffer traffic_in_history;
     RingBuffer traffic_out_history;

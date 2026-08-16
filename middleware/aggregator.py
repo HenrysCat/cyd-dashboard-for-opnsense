@@ -23,8 +23,9 @@ FIREWALL_RECENT_SHOWN = 10
 MAX_CLIENTS_SHOWN = 22
 CROWDSEC_RECENT_SHOWN = 8
 
-from config import Config
+from config import DATA_DIR, Config
 from opnsense_client import OpnsenseClient
+from traffic_totals import TrafficTotals
 
 logger = logging.getLogger("aggregator")
 
@@ -61,6 +62,7 @@ class Aggregator:
         self._latest_cpu_pct: float | None = None
         self._prev_traffic_counters: dict | None = None
         self._prev_traffic_time: float | None = None
+        self._traffic_totals = TrafficTotals(DATA_DIR / "traffic_totals.json")
         self._tasks: list[asyncio.Task] = []
 
     def start(self):
@@ -76,6 +78,9 @@ class Aggregator:
     async def stop(self):
         for task in self._tasks:
             task.cancel()
+        # Saves the counting done since the last throttled write, so a normal
+        # restart does not lose up to a minute of totals.
+        self._traffic_totals.flush()
         await self._client.aclose()
 
     async def get_snapshot(self) -> dict:
@@ -144,7 +149,7 @@ class Aggregator:
         })
 
         traffic_raw = await self._client.get_traffic()
-        await self._set_section("traffic", self._compute_traffic_bps(traffic_raw))
+        await self._set_section("traffic", self._compute_traffic(traffic_raw))
 
     async def _poll_slow(self):
         system_raw = await self._client.get_system_info()
@@ -360,7 +365,9 @@ class Aggregator:
             "updated_at": _now(),
         })
 
-    def _compute_traffic_bps(self, traffic_raw: dict) -> dict:
+    def _compute_traffic(self, traffic_raw: dict) -> dict:
+        """OPNsense reports cumulative byte counters, so both the live rate and
+        the running totals come from the same per-poll delta."""
         interfaces = traffic_raw.get("interfaces", {})
         counters = {
             "wan_in": int(interfaces.get("wan", {}).get("bytes received", 0) or 0),
@@ -371,14 +378,22 @@ class Aggregator:
         now = time.monotonic()
 
         bps = {f"{key}_bps": 0 for key in counters}
+        deltas = {key: 0 for key in counters}
         if self._prev_traffic_counters is not None and self._prev_traffic_time is not None:
             dt = now - self._prev_traffic_time
-            if dt > 0:
-                for key, value in counters.items():
-                    delta_bytes = value - self._prev_traffic_counters[key]
-                    bps[f"{key}_bps"] = max(0, int(delta_bytes * 8 / dt)) if delta_bytes >= 0 else 0
+            for key, value in counters.items():
+                # A negative delta means the firewall's counters restarted from
+                # zero (a reboot, or a manual clear). Counting it as no traffic
+                # loses a little, but keeps the totals monotonic instead of
+                # subtracting a whole uptime's worth in one poll.
+                delta_bytes = max(0, value - self._prev_traffic_counters[key])
+                deltas[key] = delta_bytes
+                if dt > 0:
+                    bps[f"{key}_bps"] = int(delta_bytes * 8 / dt)
 
         self._prev_traffic_counters = counters
         self._prev_traffic_time = now
 
-        return {**bps, "updated_at": _now()}
+        self._traffic_totals.add(deltas["wan_in"], deltas["wan_out"])
+
+        return {**bps, **self._traffic_totals.as_dict(), "updated_at": _now()}

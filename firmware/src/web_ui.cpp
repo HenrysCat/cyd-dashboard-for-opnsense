@@ -5,9 +5,11 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include "api_client.h"
 #include "data_model.h"
 #include "display_driver.h"
 #include "settings.h"
+#include "wifi_setup.h"
 
 static WebServer server(80);
 static const char *MDNS_NAME = "cyd-dash";
@@ -18,7 +20,7 @@ static String renderPage(bool saved) {
     const DisplaySettings &s = getSettings();
 
     String h;
-    h.reserve(6000);
+    h.reserve(7500);
     h += F("<!doctype html><html><head><meta charset='utf-8'>"
            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
            "<title>OPNsense Dashboard settings</title><style>"
@@ -35,6 +37,8 @@ static String renderPage(bool saved) {
            "input[type=checkbox]{width:20px;height:20px;accent-color:#ff9800;flex:none}"
            ".hint{color:#999;font-size:.85rem;margin:4px 0 0 30px}"
            "input[type=range]{width:100%;accent-color:#ff9800}"
+           "input[type=text]{width:100%;box-sizing:border-box;padding:8px;background:#222;"
+           "color:#eee;border:1px solid #444;border-radius:6px;font-size:1rem}"
            ".val{color:#ff9800;font-weight:600}"
            "button{background:#ff9800;color:#111;border:0;border-radius:8px;padding:12px 20px;"
            "font-size:1rem;font-weight:600;width:100%;cursor:pointer}"
@@ -112,6 +116,27 @@ static String renderPage(bool saved) {
     h += F("' style='width:90px;padding:6px;background:#222;color:#eee;border:1px solid #444;"
            "border-radius:6px'> seconds (5-600)</div></div>");
 
+    h += F("</fieldset><fieldset><legend>Middleware</legend>");
+
+    String hostPort;
+    bool isHttps = false;
+    wifi_setup_split_url(g_apiClient.baseUrl(), hostPort, isHttps);
+
+    h += F("<div class='row'><label class='t' for='mw'>Address</label>"
+           "<div class='hint' style='margin:8px 0 0 0'>"
+           "<input type='text' id='mw' name='mwhost' placeholder='192.168.1.50:8098' value='");
+    h += hostPort;
+    h += F("'></div>"
+           "<div class='hint' style='margin-left:0'>Host and port of the middleware container. "
+           "Applies straight away -- no reboot, and Wi-Fi credentials are left alone. "
+           "Leave blank to keep the current address.</div></div>");
+
+    h += F("<div class='row'><label class='t'><input type='checkbox' name='mwhttps'");
+    if (isHttps) h += F(" checked");
+    h += F("><span>Use HTTPS</span></label>"
+           "<div class='hint'>Only if you have put TLS in front of the middleware yourself. "
+           "It serves plain HTTP out of the box.</div></div>");
+
     h += F("</fieldset><button type='submit'>Save &amp; apply</button></form>");
 
     // Separate form: a file upload can't share the settings POST, and keeping
@@ -157,6 +182,16 @@ static void handleSave() {
     if (server.hasArg("cyclesecs")) {
         s.autoCycleSeconds = (uint16_t)constrain(server.arg("cyclesecs").toInt(),
                                                  (long)AUTO_CYCLE_MIN_S, (long)AUTO_CYCLE_MAX_S);
+    }
+
+    // Blank means "leave it as it is": the device is useless without a
+    // reachable middleware, so an empty field must not wipe a working address.
+    if (server.hasArg("mwhost")) {
+        String url = wifi_setup_build_url(server.arg("mwhost"), server.hasArg("mwhttps"));
+        if (url.length() > 0 && url != g_apiClient.baseUrl()) {
+            wifi_setup_store_middleware_url(url);
+            g_apiClient.setBaseUrl(url);
+        }
     }
 
     settingsSave(s);

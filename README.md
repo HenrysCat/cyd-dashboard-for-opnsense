@@ -51,7 +51,7 @@ calculations all happen in the middleware.
 | Page | Shows |
 |---|---|
 | Overview | Hostname, uptime, load, CPU/RAM/disk gauges, CPU trend, update badge |
-| Traffic | WAN in/out with trend chart, plus LAN throughput |
+| Traffic | WAN in/out with trend chart, today's and this month's totals, plus LAN throughput |
 | CPU & Thermal | CPU %, load, per-core and ACPI zone temperatures, temperature trend |
 | Interfaces & Gateways | Interfaces with device names, gateways, live WAN rates |
 | Services | Every service, colour-coded running/stopped, with a running count |
@@ -69,9 +69,14 @@ rotation entirely rather than showing an empty screen. The dot indicator shrinks
 - **First boot** raises a Wi-Fi captive portal to set Wi-Fi and the middleware address â€” there are
   no compile-time secrets.
 - **Settings web UI** on the device (`http://<device-ip>/` or `http://cyd-dash.local/`) covers
-  backlight, panel orientation/colour corrections, page auto-cycling, and firmware updates over
-  Wi-Fi. Everything applies immediately.
-- **Short-press BOOT** for System Info; **hold BOOT 10s** for a network factory reset.
+  backlight, panel orientation/colour corrections, page auto-cycling, the middleware address, and
+  firmware updates over Wi-Fi. Everything applies immediately.
+- **Moving the middleware** (new host, or a different port) is a field in that settings UI — it
+  takes effect on the next poll and leaves Wi-Fi credentials alone, so it costs nothing to point
+  the display at a test container and back again.
+- **Short-press BOOT** for System Info; **hold BOOT 10s** for a network factory reset. The 10s
+  hold clears Wi-Fi *and* the middleware address, so it's only needed when the device can't get
+  on the network at all — not for changing where the middleware lives.
 
 ## Robustness
 

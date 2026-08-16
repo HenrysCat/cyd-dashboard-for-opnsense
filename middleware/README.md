@@ -59,6 +59,9 @@ services:
       # OPNsense ships a self-signed certificate, which is rejected unless this
       # is "false" or you have installed a trusted certificate on the firewall.
       VERIFY_SSL: "false"
+      # Decides when the traffic totals roll over to a new day and month.
+      # Without it the container runs on UTC.
+      TZ: Europe/London
       POLL_INTERVAL_FAST: "2.0"
       POLL_INTERVAL_SLOW: "15.0"
       DATA_DIR: /app/data
@@ -203,15 +206,24 @@ Each poll is isolated: a failing call logs and keeps its last good value rather 
 whole response. Every section carries its own `updated_at`.
 
 Configuration is seeded from `.env` into `data/config.json` on a Docker volume on first run, and
-read from there afterwards.
+read from there afterwards. The same volume holds `data/traffic_totals.json`; deleting that file
+resets the usage totals to zero.
 
 ### Things computed here rather than passed through
 
 - **Traffic rates.** OPNsense reports cumulative byte counters; bits per second come from the
   difference between polls.
+- **WAN usage totals.** Those same per-poll differences are accumulated into day- and month-to-date
+  totals in `data/traffic_totals.json`, so they survive a restart of the container *and* of the
+  firewall. Counting differences rather than reading OPNsense's absolute counters is what makes a
+  firewall reboot harmless: the counter reset reads as a negative difference and is discarded,
+  instead of the total lurching backwards. The trade-off is that traffic passing while this
+  container is down is never counted, as there is no way to attribute it to a day afterwards.
+  Set `TZ` in the environment to control when "today" and "this month" roll over.
 - **Firewall block rate.** Calculated from the spread of the returned log timestamps, *not* by
   comparing them against this container's clock. The log reports the firewall's local time while
-  the container runs UTC, so a direct comparison would be out by your timezone offset.
+  this container's clock is set separately (UTC unless you set `TZ`), so a direct comparison would
+  be out by the offset between them.
 - **Client names.** DHCP leases frequently have no hostname, so the network card manufacturer from
   the ARP table is used as a fallback label.
 

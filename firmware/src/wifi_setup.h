@@ -7,6 +7,21 @@
 // middleware base URL (persisted in NVS across reboots).
 String wifi_setup_begin();
 
+// Splits a full base URL back into its "host:port" part and a scheme flag,
+// for pre-filling a form field with what is currently stored.
+void wifi_setup_split_url(const String &url, String &hostPort, bool &isHttps);
+
+// Builds a full base URL from a "host:port" form field plus an HTTPS flag.
+// Tolerates a complete URL pasted into a field that only asks for host:port,
+// in which case the scheme in the text wins over the flag. Returns an empty
+// string if nothing usable was typed.
+String wifi_setup_build_url(String hostPort, bool useHttps);
+
+// Persists the middleware base URL to NVS on its own, leaving Wi-Fi
+// credentials alone -- so the address can be corrected from the settings UI
+// without a trip through the captive portal.
+void wifi_setup_store_middleware_url(const String &url);
+
 // Wipes saved Wi-Fi credentials + middleware URL and restarts into the
 // captive portal again.
 void wifi_setup_reset_and_restart();
